@@ -1,0 +1,46 @@
+appId: com.kaupangr.desktop
+productName: Kaupangr
+copyright: Kaupangr
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - "!server/**"
+  - "!test/**"
+  - "!**/*.md"
+  - "!**/*.test.js"
+
+asar: true
+
+# better-sqlite3 ships a .node binary that can't be loaded from inside
+# an asar archive — keep it unpacked.
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+
+linux:
+  target:
+    - AppImage
+  category: Office
+  icon: build/icon.png
+  artifactName: Kaupangr-${version}.${ext}
+  synopsis: Local-first shop management
+
+win:
+  target:
+    - NSIS
+  icon: build/icon.png
+  artifactName: Kaupangr-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Kaupangr
+  uninstallDisplayName: Kaupangr
+  

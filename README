@@ -1,0 +1,210 @@
+==============================================================
+Kaupangr
+==============================================================
+
+A small-shop management app for Linux and Windows. Local-first:
+every action is written first to a local SQLite database, so the
+app works fully offline and responds instantly. A central server
+is optional, not required.
+
+--------------------------------------------------------------
+What it does
+--------------------------------------------------------------
+
+- POS with barcode scanning and live on-hand warnings
+- Stores, suppliers, products
+- Sales and returns — append-only, never edited
+- Stock tracked from movements (purchase, sale, return, adjustment)
+- Reports: by day, by store, by seller, by product, and hourly heatmap
+- Users with three roles: administrator, product manager, seller
+- Bulk price update, CSV import, CSV export
+- Receipt printing
+- Optional sync with a central server (Postgres)
+
+--------------------------------------------------------------
+Install (from source)
+--------------------------------------------------------------
+
+Requirements:
+
+  - Node.js 20+
+  - A C++ toolchain for better-sqlite3:
+      Linux:    sudo apt install build-essential python3
+      Windows:  Visual Studio Build Tools
+
+Then:
+
+  git clone <repo-url> kaupangr
+  cd kaupangr
+  npm install
+  npm start
+
+On first run, the app creates its database at:
+
+  Linux:    ~/.config/Kaupangr/kaupangr.db
+  Windows:  %APPDATA%\Kaupangr\kaupangr.db
+
+First launch bootstraps a single administrator:
+
+  Login:     admin
+  Password:  admin
+
+Change the password after the first sign-in.
+
+--------------------------------------------------------------
+Build a distributable
+--------------------------------------------------------------
+
+  npm run dist:linux     produces dist/Kaupangr-<version>.AppImage
+  npm run dist:win       produces dist/Kaupangr-Setup-<version>.exe
+
+--------------------------------------------------------------
+Server (optional)
+--------------------------------------------------------------
+
+The server is a small Express app backed by PostgreSQL. It stores
+the synchronized items and serves pull requests to other desktops.
+You only need it if you want multiple desktops (or multiple shops)
+sharing data.
+
+  cd server
+  npm install
+  DATABASE_URL='postgres://user:pass@localhost:5432/kaupangr_dev' npm start
+
+The server exposes two endpoints:
+
+  POST /sync/push
+    Receives a batch of items from a desktop.
+
+  GET /sync/pull?since=<iso>&limit=<n>
+    Returns items newer than "since".
+
+The contract is intentionally simple: the server does not interpret
+the payloads. It stores what a desktop pushes and hands it back
+on pull.
+
+Configure sync from the desktop under Settings → Sync:
+
+  1. Set the Server URL.
+  2. Tick "Enable synchronization".
+  3. Click Save.
+
+Use "Sync now" to push and pull immediately, or leave it: auto-sync
+runs every 5 minutes while a server is configured and a user is
+signed in.
+
+--------------------------------------------------------------
+Roles
+--------------------------------------------------------------
+
+Three roles are enforced in the services, not by hiding buttons in
+the UI. A seller calling a restricted action from DevTools still
+gets ForbiddenError.
+
+  administrator
+    Everything, plus user management and settings.
+
+  product_manager
+    Everything except user management and settings.
+
+  seller
+    POS, sales, returns, reports, product/inventory/supplier/store
+    viewing only. No create/edit/deactivate.
+
+Users sign in with a login and password. Only one active session
+per user at a time: a new sign-in ends the previous one.
+
+--------------------------------------------------------------
+Data model
+--------------------------------------------------------------
+
+The interesting guarantees:
+
+  - Sales and returns are append-only. UPDATE and DELETE on them
+    are blocked by SQLite triggers — not only by the UI.
+
+  - Stock on hand is derived, never stored. It's the sum of stock
+    movements. Impossible to drift.
+
+  - Every write goes through an outbox. sync_queue holds pending
+    changes for a future push. Sync never assumes the network is
+    available.
+
+  - The local SQLite is the source of truth. A server-side change
+    arrives as a pull item and is applied locally; the desktop
+    still works if the server goes down.
+
+--------------------------------------------------------------
+Development
+--------------------------------------------------------------
+
+  npm test          desktop tests (264 tests)
+  npm start         desktop app
+
+  cd server
+  npm test          server tests (28 tests)
+  npm start         server app
+
+Test runner: node --test. No external test framework.
+
+--------------------------------------------------------------
+Project layout
+--------------------------------------------------------------
+
+  src/
+    main/                 Electron main process
+      db/                 SQLite init + migrations
+      services/           All business logic
+      ipc/                Thin IPC wrappers over services
+    renderer/             UI (vanilla JS, no framework)
+      views/              One file per screen
+      state/              Shared state (session, language, sync dot)
+      i18n/               Translations (English by default)
+      styles.css          Design system
+    shared/               Errors shared between main and renderer
+
+  server/
+    src/
+      db.js               Postgres pool + migration
+      store.js            PgStore: accept + pull
+      app.js              Express routes
+      index.js            Entry point
+    test/                 Server tests
+
+  test/                   Desktop tests
+
+--------------------------------------------------------------
+Extending
+--------------------------------------------------------------
+
+The pattern for every feature is:
+
+  1. Write the test for the service behavior you want.
+  2. Write the service in src/main/services/.
+  3. Add the IPC channel in src/main/ipc/ and expose it in preload.js.
+  4. Add the view on top of the tested IPC.
+
+Every business rule lives in a service. Every service has tests.
+The renderer is a thin layer: it calls window.kaupangr.* and renders
+what comes back.
+
+--------------------------------------------------------------
+Language
+--------------------------------------------------------------
+
+The interface ships in English. Adding a second language:
+
+  1. Copy src/renderer/i18n/en.js to src/renderer/i18n/xx.js.
+  2. Translate the values on the right of each key.
+  3. Add { code: 'xx', label: 'Your Language' } to
+     src/renderer/i18n/languages.js.
+  4. In src/renderer/i18n/index.js, import the new module and add
+     it to "catalogues".
+
+Restart the app and choose the language under Settings → Language.
+
+--------------------------------------------------------------
+License
+--------------------------------------------------------------
+
+Private project, Copy left.

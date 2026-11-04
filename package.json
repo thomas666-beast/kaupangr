@@ -1,0 +1,24 @@
+{
+  "name": "kaupangr",
+  "version": "0.1.0",
+  "description": "Local-first shop management for small stores",
+  "author": "Kaupangr",
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:watch": "node --test --watch \"test/**/*.test.js\"",
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux",
+    "dist:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
+    "electron": "^32.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
